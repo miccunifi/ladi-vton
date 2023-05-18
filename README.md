@@ -24,7 +24,8 @@ This is the **official repository** for the [**paper**]() "*LaDI-VTON: Latent Di
 >  -->
 
 ## TODO
-- [ ] Source code and collected multimodal annotations
+- [ ] Inference Code
+- [ ] Train Code
 
 <!-- ## Citation
 If you make use of our work, please cite our paper:
