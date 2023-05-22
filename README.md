@@ -25,6 +25,7 @@ This is the **official repository** for the [**paper**]() "*LaDI-VTON: Latent Di
 
 ## TODO
 - [ ] Inference Code
+- [ ] Pretrained Models
 - [ ] Train Code
 
 <!-- ## Citation
