@@ -9,10 +9,10 @@
 
 **\*** Equal contribution.
 
-[![arXiv](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)]()
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](https://arxiv.org/abs/2305.13501)
 [![GitHub Stars](https://img.shields.io/github/stars/miccunifi/ladi-vton?style=social)](https://github.com/miccunifi/ladi-vton)
 
-This is the **official repository** for the [**paper**]() "*LaDI-VTON: Latent Diffusion Textual-Inversion Enhanced Virtual Try-On*".
+This is the **official repository** for the [**paper**](https://arxiv.org/abs/2305.13501) "*LaDI-VTON: Latent Diffusion Textual-Inversion Enhanced Virtual Try-On*".
 
 <!-- ## Overview -->
 
