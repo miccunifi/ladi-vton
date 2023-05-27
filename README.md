@@ -28,14 +28,17 @@ This is the **official repository** for the [**paper**](https://arxiv.org/abs/23
 - [ ] Pretrained Models
 - [ ] Train Code
 
-<!-- ## Citation
+
+## Citation
 If you make use of our work, please cite our paper:
 
 ```bibtex
-@article{baldrati2023multimodal,
-  title={Multimodal Garment Designer: Human-Centric Latent Diffusion Models for Fashion Image Editing},
-  author={Baldrati, Alberto and Morelli, Davide and Cartella, Giuseppe and Cornia, Marcella and Bertini, Marco and Cucchiara, Rita},
-  journal={arXiv preprint arXiv:2304.02051},
+@article{morelli2023ladi,
+  title={LaDI-VTON: Latent Diffusion Textual-Inversion Enhanced Virtual Try-On},
+  author={Morelli, Davide and Baldrati, Alberto and Cartella, Giuseppe and Cornia, Marcella and Bertini, Marco and Cucchiara, Rita},
+  journal={arXiv preprint arXiv:2305.13501},
   year={2023}
 }
-``` -->
+```
+## Acknowledgements
+This work has partially been supported by the PNRR project “Future Artificial Intelligence Research (FAIR)”, by the PRIN project “CREATIVE: CRoss-modal understanding and gEnerATIon of Visual and tExtual content” (CUP B87G22000460001), both co-funded by the Italian Ministry of University and Research, and by the European Commission under European Horizon 2020 Programme, grant number 101004545 - ReInHerit.
