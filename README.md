@@ -15,7 +15,6 @@
 This is the **official repository** for the [**paper**](https://arxiv.org/abs/2305.13501) "*LaDI-VTON: Latent Diffusion Textual-Inversion Enhanced Virtual Try-On*".
 
 <!-- ## Overview -->
-
 <!-- <p align="center">
     <img src="images/1.gif" style="max-width:500px">
 </p> -->
