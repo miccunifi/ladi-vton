@@ -59,8 +59,7 @@ Alternatively, you can create a new conda environment and install the required p
 ```sh
 conda create -n ladi-vton -y python=3.10
 conda activate ladi-vton
-conda install -y pytorch torchvision pytorch-cuda=11.7 -c pytorch -c nvidia
-pip install opencv-python==4.7.0.72 diffusers==0.14.0 transformers==4.27.3 accelerate==0.18.0 clean-fid==0.1.35 torchmetrics[image]==0.11.4 wandb==0.14.0 matplotlib==3.7.1 tqdm xformers
+pip install torch==2.0.1 torchvision==0.15.2 opencv-python==4.7.0.72 diffusers==0.14.0 transformers==4.27.3 accelerate==0.18.0 clean-fid==0.1.35 torchmetrics[image]==0.11.4 wandb==0.14.0 matplotlib==3.7.1 tqdm xformers
 ```
 
 ### Data Preparation
