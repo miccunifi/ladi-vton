@@ -1,4 +1,4 @@
-# LaDI-VTON
+# LaDI-VTON (ACM Multimedia 2023)
 ### Latent Diffusion Textual-Inversion Enhanced Virtual Try-On
 [**Davide Morelli**](https://scholar.google.com/citations?user=UJ4D3rYAAAAJ&hl=en)**\***,
 [**Alberto Baldrati**](https://scholar.google.com/citations?hl=en&user=I1jaZecAAAAJ)**\***,
@@ -27,10 +27,10 @@ This is the **official repository** for the [**paper**](https://arxiv.org/abs/23
 If you make use of our work, please cite our paper:
 
 ```bibtex
-@article{morelli2023ladi,
-  title={LaDI-VTON: Latent Diffusion Textual-Inversion Enhanced Virtual Try-On},
+@inproceedings{morelli2023ladi,
+  title={{LaDI-VTON: Latent Diffusion Textual-Inversion Enhanced Virtual Try-On}},
   author={Morelli, Davide and Baldrati, Alberto and Cartella, Giuseppe and Cornia, Marcella and Bertini, Marco and Cucchiara, Rita},
-  journal={arXiv preprint arXiv:2305.13501},
+  booktitle={Proceedings of the ACM International Conference on Multimedia},
   year={2023}
 }
 ```
