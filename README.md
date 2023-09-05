@@ -159,8 +159,8 @@ python src/inference.py --dataset [dresscode | vitonhd] --dresscode_dataroot <pa
 
 ```
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --test_order <str>             test setting, options: ['paired', 'unpaired']
     --category <str>               category to test, options: ['all', 'lower_body', 'upper_body', 'dresses'] (default=all)
     --output_dir <str>             output directory
@@ -189,8 +189,8 @@ python src/utils/val_metrics.py --gen_folder <path> --dataset [dresscode | viton
 ```
     --gen_folder <str>             Path to the generated images folder.
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --test_order <str>             test setting, options: ['paired', 'unpaired']
     --category <str>               category to test, options: ['all', 'lower_body', 'upper_body', 'dresses'] (default=all)
     --batch_size                   batch size (default=32)
@@ -206,7 +206,7 @@ In this section, you'll find instructions on how to train all the components of 
 
 ### 1. Train Warping Module
 
-First of all we need to train the warping module. To do so, run the following command:
+First of all, we need to train the warping module. To do so, run the following command:
 
 ```sh
 python src/train_tps.py --dataset [dresscode | vitonhd] --dresscode_dataroot <path> --vitonhd_dataroot <path> --checkpoints_dir <path> --exp_name <str>
@@ -236,7 +236,7 @@ python src/train_tps.py --dataset [dresscode | vitonhd] --dresscode_dataroot <pa
 
 At the end of the training, the warped cloth images will be saved in the `data/warped_cloths`
 and `data/warped_cloths_unpaired` folders.
-To save computation time, in the following steps we will use the pre-extracted warped cloth images.
+To save computation time, in the following steps, we will use the pre-extracted warped cloth images.
 
 ### 2. Train EMASC
 
@@ -248,8 +248,8 @@ python src/train_emasc.py --dataset [dresscode | vitonhd] --dresscode_dataroot <
 
 ```
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --output_dir <str>             output directory where the model predictions and checkpoints will be written
     --pretrained_model_name_or_path <str>
                                    model identifier from huggingface.co/models (default=stabilityai/stable-diffusion-2-inpainting)
@@ -259,7 +259,7 @@ python src/train_emasc.py --dataset [dresscode | vitonhd] --dresscode_dataroot <
     --num_train_epochs <int>       number of training epochs (default=100)
     --max_train_steps <int>        maximum number of training steps. If provided, overrides num_train_epochs (default=40k)
     --gradient_accumulation_steps <int>
-                                   number of updates steps to accumulate before performing a backward/update pass (default=1)
+                                   number of update steps to accumulate before performing a backward/update pass (default=1)
     --learning_rate <float>        learning rate (default=1e-5)
     --lr_scheduler <str>           learning rate scheduler, options: ['linear', 'cosine', 'cosine_with_restarts', 'polynomial', 'constant', 'constant_with_warmup'] (default=constant_with_warmup)
     --lr_warmup_steps <int>        number of warmup steps for learning rate scheduler (default=500)
@@ -297,8 +297,8 @@ python src/utils/compute_cloth_clip_features.py --dataset [dresscode | vitonhd] 
 
 ```
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --pretrained_model_name_or_path <str>
                                    model identifier from huggingface.co/models (default=stabilityai/stable-diffusion-2-inpainting)
     --batch_size <int>             batch size (default=16)
@@ -319,8 +319,8 @@ python src/train_inversion_adapter.py --dataset [dresscode | vitonhd] --dresscod
 
 ```
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --output_dir <str>             output directory where the model predictions and checkpoints will be written
     --pretrained_model_name_or_path <str>
                                    model identifier from huggingface.co/models (default=stabilityai/stable-diffusion-2-inpainting)
@@ -330,7 +330,7 @@ python src/train_inversion_adapter.py --dataset [dresscode | vitonhd] --dresscod
     --num_train_epochs <int>       number of training epochs (default=100)
     --max_train_steps <int>        maximum number of training steps. If provided, overrides num_train_epochs (default=200k)
     --gradient_accumulation_steps <int>
-                                   number of updates steps to accumulate before performing a backward/update pass (default=1)
+                                   number of update steps to accumulate before performing a backward/update pass (default=1)
     --gradient_checkpointing <store_true>
                                    use gradient checkpointing to save memory at the expense of slower backward pass (default=False)
     --learning_rate <float>        learning rate (default=1e-5)
@@ -352,7 +352,7 @@ python src/train_inversion_adapter.py --dataset [dresscode | vitonhd] --dresscod
     --num_workers_test <int>       number of workers for test dataloader (default=8)
     --test_order <str>             test setting, options: ['paired', 'unpaired'] (default=paired)
     --num_vstar <int>              number of predicted v* per image to use (default=16)
-    --num_encoder_layers <int>     number of ViT layer to use in inversion adapter (default=1)
+    --num_encoder_layers <int>     number of ViT layers to use in inversion adapter (default=1)
     --use_clip_cloth_features <store_true>
                                    use precomputed clip cloth features instead of computing them each iteration (default=False).
 ```
@@ -376,10 +376,10 @@ python src/train_vto.py --dataset [dresscode | vitonhd] --dresscode_dataroot <pa
 
 ```
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --output_dir <str>             output directory where the model predictions and checkpoints will be written
-    --inversion_adapter_dir <str>  path to the inversion adapter checkpoint directory. Should be the same as `output_dir` of the inversion adapter training script. If not specified, inversion adapter will be trained from scratch. (default=None)
+    --inversion_adapter_dir <str>  path to the inversion adapter checkpoint directory. Should be the same as `output_dir` of the inversion adapter training script. If not specified, the inversion adapter will be trained from scratch. (default=None)
     --inversion_adapter_name <str> name of the inversion adapter checkpoint. To load the latest checkpoint, use `latest`. (default=latest)
      --pretrained_model_name_or_path <str>
                                    model identifier from huggingface.co/models (default=stabilityai/stable-diffusion-2-inpainting)
@@ -389,7 +389,7 @@ python src/train_vto.py --dataset [dresscode | vitonhd] --dresscode_dataroot <pa
     --num_train_epochs <int>       number of training epochs (default=100)
     --max_train_steps <int>        maximum number of training steps. If provided, overrides num_train_epochs (default=200k)
     --gradient_accumulation_steps <int>
-                                   number of updates steps to accumulate before performing a backward/update pass (default=1)
+                                   number of update steps to accumulate before performing a backward/update pass (default=1)
     --gradient_checkpointing <store_true>
                                    use gradient checkpointing to save memory at the expense of slower backward pass (default=False)
     --learning_rate <float>        learning rate (default=1e-5)
@@ -414,7 +414,7 @@ python src/train_vto.py --dataset [dresscode | vitonhd] --dresscode_dataroot <pa
     --text_usage <str>             text features to use, options: ['none', 'noun_chunks', 'inversion_adapter'] (default=inversion_adapter)
     --cloth_input_type <str>       cloth input type, options: ['none', 'warped'], (default=warped)
     --num_vstar <int>              number of predicted v* per image to use (default=16)
-    --num_encoder_layers <int>     number of ViT layer to use in inversion adapter (default=1)
+    --num_encoder_layers <int>     number of ViT layers to use in inversion adapter (default=1)
     --train_inversion_adapter <store_true>
                                    train the inversion adapter during the VTO training (default=False)
     --use_clip_cloth_features <store_true>
@@ -427,7 +427,7 @@ At the end of the training, the checkpoints will be saved in the `output_dir` fo
 **NOTE**: You can use the `--use_clip_cloth_features` flag only if you have previously computed the clip cloth features
 using the `src/utils/compute_cloth_clip_features.py` script (step 2.5).
 
-### 5. Inference With the trained models
+### 5. Inference with the trained models
 
 Before running the inference, make sure to specify the correct path to all the trained checkpoints.
 Make sure to also use coherent hyperparameters with the ones used during training.
@@ -440,8 +440,8 @@ python src/eval.py --dataset [dresscode | vitonhd] --dresscode_dataroot <path> -
 
 ```
     --dataset <str>                dataset to use, options: ['dresscode', 'vitonhd']
-    --dresscode_dataroot <str>     dataroot of dresscode dataset (required when dataset=dresscode)
-    --vitonhd_dataroot <str>       dataroot of vitonhd dataset (required when dataset=vitonhd)
+    --dresscode_dataroot <str>     data root of dresscode dataset (required when dataset=dresscode)
+    --vitonhd_dataroot <str>       data root of vitonhd dataset (required when dataset=vitonhd)
     --output_dir <str>             output directory where the generated images will be written
     --save_name <str>              name of the generated images folder inside `output_dir`
     --test_order <str>             test setting, options: ['paired', 'unpaired']
@@ -466,7 +466,7 @@ python src/eval.py --dataset [dresscode | vitonhd] --dresscode_dataroot <path> -
     --text_usage <str>             text features to use, options: ['none', 'noun_chunks', 'inversion_adapter'] (default=inversion_adapter)
     --cloth_input_type <str>       cloth input type, options: ['none', 'warped'], (default=warped)
     --num_vstar <int>              number of predicted v* per image to use (default=16)
-    --num_encoder_layers <int>     number of ViT layer to use in inversion adapter (default=1)
+    --num_encoder_layers <int>     number of ViT layers to use in inversion adapter (default=1)
     --use_png <store_true>         use png instead of jpg (default=False)
     --num_inference_steps <int>    number of diffusion steps at inference time (default=50)
     --guidance_scale <float>       guidance scale of the diffusion (default=7.5)
