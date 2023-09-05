@@ -45,6 +45,15 @@ def parse_args():
         help="Path to the output directory",
     )
 
+    parser.add_argument(
+        "--allow_tf32",
+        action="store_true",
+        help=(
+            "Whether or not to allow TF32 on Ampere GPUs. Can be used to speed up training. For more information, see"
+            " https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices"
+        ),
+    )
+
     parser.add_argument("--seed", type=int, default=1234, help="A seed for reproducible training.")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size to use.")
 
@@ -67,17 +76,17 @@ def parse_args():
     parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
     parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
 
-    parser.add_argument("--num_workers", type=int, default=8,
-                        help="The name of the repository to keep in sync with the local `output_dir`.")
+    parser.add_argument("--num_workers", type=int, default=8, help="Number of workers for the dataloader")
 
     parser.add_argument("--num_vstar", default=16, type=int, help="Number of predicted v* images to use")
     parser.add_argument("--test_order", type=str, required=True, choices=["unpaired", "paired"])
     parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
     parser.add_argument("--category", type=str, choices=['all', 'lower_body', 'upper_body', 'dresses'], default='all')
-    parser.add_argument("--use_png", default=False, action="store_true")
-    parser.add_argument("--num_inference_steps", default=50, type=int)
-    parser.add_argument("--guidance_scale", default=7.5, type=float)
-    parser.add_argument("--compute_metrics", default=False, action="store_true")
+    parser.add_argument("--use_png", default=False, action="store_true", help="Whether to use png or jpg for saving")
+    parser.add_argument("--num_inference_steps", default=50, type=int, help="Number of diffusion steps")
+    parser.add_argument("--guidance_scale", default=7.5, type=float, help="Guidance scale")
+    parser.add_argument("--compute_metrics", default=False, action="store_true",
+                        help="Compute metrics after generation")
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -97,6 +106,11 @@ def main():
     if args.dataset == "dresscode" and args.dresscode_dataroot is None:
         raise ValueError("DressCode dataroot must be provided")
 
+    # Enable TF32 for faster inference on Ampere GPUs,
+    # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
+    if args.allow_tf32:
+        torch.backends.cuda.matmul.allow_tf32 = True
+
     # Setup accelerator and device.
     accelerator = Accelerator(mixed_precision=args.mixed_precision)
     device = accelerator.device
@@ -115,10 +129,13 @@ def main():
     tokenizer = CLIPTokenizer.from_pretrained(args.pretrained_model_name_or_path, subfolder="tokenizer")
 
     # Load the trained models from the hub
-    unet = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='extended_unet', dataset=args.dataset)
+    unet = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='extended_unet',
+                          dataset=args.dataset)
     emasc = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='emasc', dataset=args.dataset)
-    inversion_adapter = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='inversion_adapter', dataset=args.dataset)
-    tps, refinement = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='warping_module', dataset=args.dataset)
+    inversion_adapter = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='inversion_adapter',
+                                       dataset=args.dataset)
+    tps, refinement = torch.hub.load(repo_or_dir='miccunifi/ladi-vton', source='github', model='warping_module',
+                                     dataset=args.dataset)
 
     int_layers = [1, 2, 3, 4, 5]
 
@@ -169,14 +186,16 @@ def main():
     weight_dtype = torch.float32
     if args.mixed_precision == 'fp16':
         weight_dtype = torch.float16
+    elif args.mixed_precision == 'bf16':
+        weight_dtype = torch.bfloat16
 
     text_encoder.to(device, dtype=weight_dtype)
     vae.to(device, dtype=weight_dtype)
     emasc.to(device, dtype=weight_dtype)
     inversion_adapter.to(device, dtype=weight_dtype)
     unet.to(device, dtype=weight_dtype)
-    tps.to(device, dtype=weight_dtype)
-    refinement.to(device, dtype=weight_dtype)
+    tps.to(device, dtype=torch.float32)
+    refinement.to(device, dtype=torch.float32)
     vision_encoder.to(device, dtype=weight_dtype)
 
     # Set to eval mode
@@ -230,7 +249,7 @@ def main():
                                                                 torchvision.transforms.InterpolationMode.BILINEAR,
                                                                 antialias=True)
         agnostic = torch.cat([low_im_mask, low_pose_map], 1)
-        low_grid, theta, rx, ry, cx, cy, rg, cg = tps(low_cloth, agnostic)
+        low_grid, theta, rx, ry, cx, cy, rg, cg = tps(low_cloth.to(torch.float32), agnostic.to(torch.float32))
 
         # We upsample the grid to the original image size and warp the cloth using the predicted TPS parameters
         highres_grid = torchvision.transforms.functional.resize(low_grid.permute(0, 3, 1, 2),
@@ -238,12 +257,13 @@ def main():
                                                                 interpolation=torchvision.transforms.InterpolationMode.BILINEAR,
                                                                 antialias=True).permute(0, 2, 3, 1)
 
-        warped_cloth = F.grid_sample(cloth, highres_grid, padding_mode='border')
+        warped_cloth = F.grid_sample(cloth.to(torch.float32), highres_grid.to(torch.float32), padding_mode='border')
 
         # Refine the warped cloth using the refinement network
         warped_cloth = torch.cat([im_mask, pose_map, warped_cloth], 1)
-        warped_cloth = refinement(warped_cloth)
+        warped_cloth = refinement(warped_cloth.to(torch.float32))
         warped_cloth = warped_cloth.clamp(-1, 1)
+        warped_cloth = warped_cloth.to(weight_dtype)
 
         # Get the visual features of the in-shop cloths
         input_image = torchvision.transforms.functional.resize((cloth + 1) / 2, (224, 224),
@@ -314,6 +334,7 @@ def main():
     del vision_encoder
     torch.cuda.empty_cache()
 
+    # Compute metrics if requested
     if args.compute_metrics:
         metrics = compute_metrics(save_dir, args.test_order, args.dataset, args.category, ['all'],
                                   args.dresscode_dataroot, args.vitonhd_dataroot)

@@ -29,6 +29,10 @@ os.environ["WANDB_START_METHOD"] = "thread"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
+    parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
+    parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
+    parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
+
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
@@ -36,28 +40,13 @@ def parse_args():
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
 
-    parser.add_argument("--test_batch_size", type=int, default=16,
+    parser.add_argument("--batch_size", type=int, default=16,
                         help="Batch size (per device) for the testing dataloader.")
 
-    parser.add_argument(
-        "--mixed_precision",
-        type=str,
-        default=None,
-        choices=["no", "fp16", "bf16"],
-        help=(
-            "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
-            " 1.10.and an Nvidia Ampere GPU.  Default to the value of accelerate config of the current system or the"
-            " flag passed with the `accelerate.launch` command. Use this argument to override the accelerate config."
-        ),
-    )
 
-    parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
-    parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
+    parser.add_argument("--num_workers", type=int, default=8,
+                        help="Number of workers for the testing dataloader.")
 
-    parser.add_argument("--num_workers_test", type=int, default=8,
-                        help="The name of the repository to keep in sync with the local `output_dir`.")
-
-    parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
     args = parser.parse_args()
 
     return args
@@ -72,7 +61,8 @@ def main():
         raise ValueError("VitonHD dataroot must be provided")
     if args.dataset == "dresscode" and args.dresscode_dataroot is None:
         raise ValueError("DressCode dataroot must be provided")
-    accelerator = Accelerator(mixed_precision=args.mixed_precision)
+
+    accelerator = Accelerator()
     device = accelerator.device
 
     # Get the vision encoder and the processor
@@ -134,15 +124,15 @@ def main():
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=False,
-        batch_size=args.test_batch_size,
-        num_workers=args.num_workers_test,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
     )
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
         shuffle=False,
-        batch_size=args.test_batch_size,
-        num_workers=args.num_workers_test,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
     )
 
     # Extract the CLIP features for the clothes in the dataset and save them to disk.

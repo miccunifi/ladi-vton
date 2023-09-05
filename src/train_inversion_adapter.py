@@ -40,6 +40,18 @@ os.environ["WANDB_START_METHOD"] = "thread"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Inversion adapter training script.")
+
+    parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
+    parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
+    parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="The output directory where the model predictions and checkpoints will be written.",
+    )
+
+
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
@@ -47,12 +59,6 @@ def parse_args():
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
 
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
 
     parser.add_argument("--seed", type=int, default=1234, help="A seed for reproducible training.")
 
@@ -68,7 +74,7 @@ def parse_args():
     parser.add_argument(
         "--max_train_steps",
         type=int,
-        default=None,
+        default=200001,
         help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
     )
     parser.add_argument(
@@ -88,16 +94,11 @@ def parse_args():
         default=1e-5,
         help="Initial learning rate (after the potential warmup period) to use.",
     )
-    parser.add_argument(
-        "--scale_lr",
-        action="store_true",
-        default=False,
-        help="Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
-    )
+
     parser.add_argument(
         "--lr_scheduler",
         type=str,
-        default="constant",
+        default="constant_with_warmup",
         help=(
             'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
             ' "constant", "constant_with_warmup"]'
@@ -124,7 +125,7 @@ def parse_args():
     parser.add_argument(
         "--mixed_precision",
         type=str,
-        default=None,
+        default='fp16',
         choices=["no", "fp16", "bf16"],
         help=(
             "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
@@ -164,16 +165,12 @@ def parse_args():
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
 
-    parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
-    parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
-
     parser.add_argument("--num_workers", type=int, default=8, help="Number of workers to use in the dataloaders.")
     parser.add_argument("--num_workers_test", type=int, default=8,
                         help="Number of workers to use in the test dataloaders.")
-    parser.add_argument("--test_order", type=str, default="unpaired", choices=["unpaired", "paired"],
+    parser.add_argument("--test_order", type=str, default="paired", choices=["unpaired", "paired"],
                         help="Whether to use paired or unpaired test data.")
-    parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
-    parser.add_argument("--num_vstar", default=16, type=int, help="Number of predicted v* images to use")
+    parser.add_argument("--num_vstar", default=16, type=int, help="Number of predicted v* per image to use")
     parser.add_argument("--num_encoder_layers", default=1, type=int,
                         help="Number of ViT layer to use in inversion adapter")
     parser.add_argument("--use_clip_cloth_features", action="store_true",
@@ -230,6 +227,7 @@ def main():
     text_encoder = CLIPTextModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="text_encoder")
 
+    # Load the vision encoder and get the CLIP processor
     if args.pretrained_model_name_or_path == "runwayml/stable-diffusion-inpainting":
         vision_encoder = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-large-patch14")
         processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
@@ -238,8 +236,9 @@ def main():
         processor = AutoProcessor.from_pretrained("laion/CLIP-ViT-H-14-laion2B-s32B-b79K")
     else:
         raise ValueError(f"Unknown pretrained model name or path: {args.pretrained_model_name_or_path}")
-
     vision_encoder.to(accelerator.device)
+
+    # Load the VAE and UNet
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae")
     unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
 
@@ -262,16 +261,12 @@ def main():
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
+        text_encoder.gradient_checkpointing_enable()
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if args.allow_tf32:
         torch.backends.cuda.matmul.allow_tf32 = True
-
-    # Scale learning rate by gradient accumulation steps and number of devices
-    if args.scale_lr:
-        args.learning_rate = (
-                args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes)
 
     # Initialize the optimizer
     optimizer = torch.optim.AdamW(
@@ -388,7 +383,7 @@ def main():
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
-        accelerator.init_trackers("inversion_adapter", config=vars(args),
+        accelerator.init_trackers("LaDI_VTON_inversion_adapter", config=vars(args),
                                   init_kwargs={"wandb": {"name": os.path.basename(args.output_dir)}})
         if args.report_to == 'wandb':
             wandb_tracker = accelerator.get_tracker("wandb")
@@ -543,8 +538,10 @@ def main():
                                                               f"checkpoint-{global_step}")
                         accelerator.save_state(accelerator_state_path)
 
-                        # Test the model
+                        # Unwrap the inversion adapter
                         unwrapped_adapter = accelerator.unwrap_model(inversion_adapter, keep_fp32_wrapper=True)
+
+
                         with torch.no_grad():
                             val_pipe = StableDiffusionInpaintPipeline(
                                 text_encoder=text_encoder,
@@ -590,7 +587,6 @@ def main():
                             accelerator.save(unwrapped_adapter.state_dict(), inversion_adapter_path)
                             del unwrapped_adapter
 
-                        # inversion_adapter = inversion_adapter.float()
                         inversion_adapter.train()
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}

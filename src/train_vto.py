@@ -1,6 +1,7 @@
 # File based on https://github.com/huggingface/diffusers/blob/main/examples/text_to_image/train_text_to_image.py
 
 import argparse
+import itertools
 import logging
 import os
 import shutil
@@ -26,11 +27,11 @@ from dataset.dresscode import DressCodeDataset
 from dataset.vitonhd import VitonHDDataset
 from models.AutoencoderKL import AutoencoderKL
 from models.inversion_adapter import InversionAdapter
-from vto_pipelines.tryon_pipe import StableDiffusionTryOnePipeline
 from utils.encode_text_word_embedding import encode_text_word_embedding
 from utils.image_from_pipe import generate_images_from_tryon_pipe
 from utils.set_seeds import set_seed
 from utils.val_metrics import compute_metrics
+from vto_pipelines.tryon_pipe import StableDiffusionTryOnePipeline
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 check_min_version("0.10.0.dev0")
@@ -39,9 +40,31 @@ logger = get_logger(__name__, log_level="INFO")
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 os.environ["WANDB_START_METHOD"] = "thread"
 
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="VTO training script.")
+    parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
+    parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
+    parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="The output directory where the model predictions and checkpoints will be written.",
+    )
+
+    parser.add_argument(
+        "--inversion_adapter_dir",
+        type=str,
+        default=None,
+        help="Directory where to load the trained inversion adapter from. If not specified, inversion adapter will be trained from scratch.",
+    )
+    parser.add_argument("--inversion_adapter_name", type=str, default="latest",
+                        help="Name of the inversion adapter to load from the directory specified by `--inversion_adapter_dir`. To load the latest checkpoint, use `latest`.")
+
+
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
@@ -49,12 +72,6 @@ def parse_args():
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
 
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
 
     parser.add_argument("--seed", type=int, default=1234, help="A seed for reproducible training.")
 
@@ -70,7 +87,7 @@ def parse_args():
     parser.add_argument(
         "--max_train_steps",
         type=int,
-        default=None,
+        default=200001,
         help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
     )
     parser.add_argument(
@@ -90,16 +107,11 @@ def parse_args():
         default=1e-5,
         help="Initial learning rate (after the potential warmup period) to use.",
     )
-    parser.add_argument(
-        "--scale_lr",
-        action="store_true",
-        default=False,
-        help="Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
-    )
+
     parser.add_argument(
         "--lr_scheduler",
         type=str,
-        default="constant",
+        default="constant_with_warmup",
         help=(
             'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
             ' "constant", "constant_with_warmup"]'
@@ -125,7 +137,7 @@ def parse_args():
     parser.add_argument(
         "--mixed_precision",
         type=str,
-        default=None,
+        default='fp16',
         choices=["no", "fp16", "bf16"],
         help=(
             "Whether to use mixed precision. Choose between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >="
@@ -143,16 +155,8 @@ def parse_args():
         ),
     )
 
-    parser.add_argument(
-        "--inversion_adapter_dir",
-        type=str,
-        default=None,
-        help="Directory where to load the trained inversion adapter from. If not specified, inversion adapter will be trained from scratch.",
-    )
-    parser.add_argument("--inversion_adapter_name", type=str, default="latest",
-                        help="Name of the inversion adapter to load from the directory specified by `--inversion_adapter_dir`. To load the latest checkpoint, use `latest`.")
-
-    parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
+    parser.add_argument("--local_rank", type=int, default=-1,
+                        help="For distributed training: local_rank")
     parser.add_argument(
         "--checkpointing_steps",
         type=int,
@@ -175,26 +179,22 @@ def parse_args():
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
 
-    parser.add_argument('--dresscode_dataroot', type=str, help='DressCode dataroot')
-    parser.add_argument('--vitonhd_dataroot', type=str, help='VitonHD dataroot')
-
     parser.add_argument("--num_workers", type=int, default=8, help="Number of workers to use in the dataloaders.")
     parser.add_argument("--num_workers_test", type=int, default=8,
                         help="Number of workers to use in the test dataloaders.")
 
     parser.add_argument("--test_order", type=str, default="unpaired", choices=["unpaired", "paired"])
     parser.add_argument("--uncond_fraction", type=float, default=0.2, help="Fraction of unconditioned training samples")
-    parser.add_argument("--dataset", type=str, required=True, choices=["dresscode", "vitonhd"], help="dataset to use")
-    parser.add_argument("--text_usage", type=str,
+    parser.add_argument("--text_usage", type=str, default='inversion_adapter',
                         choices=["none", "noun_chunks", "inversion_adapter"],
                         help="if 'none' do not use the text, if 'noun_chunks' use the coarse noun chunks, if "
-                             "'inversion_adapter' use the features obtained trough the inversion adapter net")
-    parser.add_argument("--cloth_input_type", type=str, choices=["warped", "none"], required=True,
+                             "'inversion_adapter' use the features obtained trough the inversion adapter network")
+    parser.add_argument("--cloth_input_type", type=str, choices=["warped", "none"], default='warped',
                         help="cloth input type. If 'warped' use the warped cloth, if none do not use the cloth as input of the unet")
     parser.add_argument("--num_vstar", default=16, type=int, help="Number of predicted v* images to use")
     parser.add_argument("--num_encoder_layers", default=1, type=int,
                         help="Number of ViT layer to use in inversion adapter")
-    parser.add_argument("--train_inversion_adapter", default=False, action="store_true",
+    parser.add_argument("--train_inversion_adapter", action="store_true",
                         help="Train also the inversion adapter during training")
     parser.add_argument("--use_clip_cloth_features", action="store_true",
                         help="Whether to use precomputed clip cloth features")
@@ -290,16 +290,13 @@ def main():
     if args.gradient_checkpointing:
         # Enable gradient checkpointing for memory efficient training
         unet.enable_gradient_checkpointing()
+        if args.text_usage == "inversion_adapter":
+            text_encoder.gradient_checkpointing_enable()
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
     if args.allow_tf32:
         torch.backends.cuda.matmul.allow_tf32 = True
-
-    # Scale learning rate by gradient accumulation steps and number of devices
-    if args.scale_lr:
-        args.learning_rate = (
-                args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes)
 
     # Initialize the optimizer
     optimizer = torch.optim.AdamW(
@@ -341,7 +338,7 @@ def main():
                 dirs = [d for d in dirs if d.startswith("inversion_adapter")]
                 dirs = sorted(dirs, key=lambda x: int(os.path.splitext(x.split("_")[-1])[0]))
                 path = dirs[-1]
-            accelerator.print(f"Resuming from checkpoint {path}")
+            accelerator.print(f"Loading inversion adapter checkpoint {path}")
             inversion_adapter.load_state_dict(torch.load(os.path.join(args.inversion_adapter_dir, path)))
         else:
             print("No inversion adapter checkpoint found. Training from scratch.", flush=True)
@@ -350,6 +347,7 @@ def main():
             optimizer.add_param_group({'params': inversion_adapter.parameters(), 'lr': args.learning_rate})
         else:
             inversion_adapter.requires_grad_(False)
+            inversion_adapter.eval()
 
         if args.use_clip_cloth_features:
             outputlist.append('clip_cloth_features')
@@ -397,7 +395,7 @@ def main():
             outputlist=tuple(outputlist)
         )
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f"Unknown dataset {args.dataset}")
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
@@ -427,13 +425,11 @@ def main():
         num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
     )
 
-    # TODO comment
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16":
         weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
-
 
     # Prepare everything with our `accelerator`.
     if args.text_usage == "inversion_adapter":
@@ -463,7 +459,7 @@ def main():
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
-        accelerator.init_trackers("virtual_tryon", config=vars(args),
+        accelerator.init_trackers("LaDI_VTON_vto", config=vars(args),
                                   init_kwargs={"wandb": {"name": os.path.basename(args.output_dir)}})
         if args.report_to == 'wandb':
             wandb_tracker = accelerator.get_tracker("wandb")
@@ -509,7 +505,9 @@ def main():
 
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
-        inversion_adapter.train()
+        if inversion_adapter is not None and args.train_inversion_adapter:
+            inversion_adapter.train()
+
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             # Skip steps until we reach the resumed step
@@ -518,7 +516,7 @@ def main():
                     progress_bar.update(1)
                 continue
 
-            with accelerator.accumulate(unet):
+            with accelerator.accumulate(unet), accelerator.accumulate(inversion_adapter):
                 # Convert images to latent space
                 latents = vae.encode(batch["image"].to(weight_dtype))[0].latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
@@ -642,9 +640,12 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(unet.parameters(), args.max_grad_norm)
                     if args.train_inversion_adapter:
-                        accelerator.clip_grad_norm_(inversion_adapter.parameters(), args.max_grad_norm)
+                        accelerator.clip_grad_norm_(itertools.chain(unet.parameters(), inversion_adapter.parameters()),
+                                                    args.max_grad_norm)
+
+                    else:
+                        accelerator.clip_grad_norm_(unet.parameters(), args.max_grad_norm)
 
                 optimizer.step()
                 lr_scheduler.step()
@@ -660,14 +661,17 @@ def main():
                 # Save checkpoint every checkpointing_steps steps
                 if global_step % args.checkpointing_steps == 0:
                     unet.eval()
+                    if inversion_adapter is not None:
+                        inversion_adapter.eval()
                     if accelerator.is_main_process:
                         os.makedirs(os.path.join(args.output_dir, "checkpoint"), exist_ok=True)
                         accelerator_state_path = os.path.join(args.output_dir, "checkpoint",
                                                               f"checkpoint-{global_step}")
-                        # accelerator.save_state(accelerator_state_path)
+                        accelerator.save_state(accelerator_state_path)
 
-                        # Test the model
+                        # Unwrap the Unet
                         unwrapped_unet = accelerator.unwrap_model(unet, keep_fp32_wrapper=True)
+
                         with torch.no_grad():
                             val_pipe = StableDiffusionTryOnePipeline(
                                 text_encoder=text_encoder,
@@ -717,11 +721,11 @@ def main():
 
                                 del unwrapped_adapter
 
-                            del unwrapped_adapter
+                            del unwrapped_unet
                             del val_pipe
 
-                        # unet = unet.float()
                         unet.train()
+                        inversion_adapter.train()
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)

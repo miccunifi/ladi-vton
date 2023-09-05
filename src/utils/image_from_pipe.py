@@ -28,8 +28,7 @@ def generate_images_from_tryon_pipe(pipe: StableDiffusionTryOnePipeline, inversi
                                     save_name: str, text_usage: str, vision_encoder: CLIPVisionModelWithProjection,
                                     processor: CLIPProcessor, cloth_input_type: str, cloth_cond_rate: int = 1,
                                     num_vstar: int = 1, seed: int = 1234, num_inference_steps: int = 50,
-                                    guidance_scale: int = 7.5,
-                                    use_png: bool = False):
+                                    guidance_scale: int = 7.5, use_png: bool = False):
     # Create output directory
     save_path = os.path.join(output_dir, f"{save_name}_{order}")
     os.makedirs(save_path, exist_ok=True)
@@ -221,8 +220,8 @@ def generate_images_inversion_adapter(pipe: StableDiffusionInpaintPipeline, inve
 
 @torch.inference_mode()
 def extract_save_vae_images(vae: AutoencoderKL, emasc: EMASC, test_dataloader: torch.utils.data.DataLoader,
-                            int_layers: List[int], output_dir: str, order: str, save_name: str, emasc_type: str,
-                            mask_feat: bool) -> None:
+                            int_layers: List[int], output_dir: str, order: str, save_name: str,
+                            emasc_type: str) -> None:
     """
     Extract and save image using only VAE or VAE + EMASC
     """
@@ -242,8 +241,7 @@ def extract_save_vae_images(vae: AutoencoderKL, emasc: EMASC, test_dataloader: t
             # Use EMASC
             processed_intermediate_features = emasc(intermediate_features)
 
-            if mask_feat:
-                processed_intermediate_features = mask_features(processed_intermediate_features, batch["inpaint_mask"])
+            processed_intermediate_features = mask_features(processed_intermediate_features, batch["inpaint_mask"])
             latents = posterior_im.latent_dist.sample()
             generated_images = vae.decode(latents, processed_intermediate_features, int_layers).sample
         else:

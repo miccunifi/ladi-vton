@@ -38,11 +38,8 @@ def extended_unet(dataset: Literal['dresscode', 'vitonhd']):
 
 
 def emasc(dataset: Literal['dresscode', 'vitonhd']):
-    in_feature_channels = [128, 128, 256, 512]
-    out_feature_channels = [256, 512, 512, 512]
-
-    in_feature_channels.insert(0, 128)
-    out_feature_channels.insert(0, 128)
+    in_feature_channels = [128, 128, 128, 256, 512]
+    out_feature_channels = [128, 256, 512, 512, 512]
 
     emasc = EMASC(in_feature_channels,
                   out_feature_channels,
